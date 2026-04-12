@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(\"C:/Users/erebo/.config/herd/bin/php84/php.exe\" \"C:/ProgramData/ComposerSetup/bin/composer.phar\" install --no-interaction)"
+    ]
+  }
+}

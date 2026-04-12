@@ -1,0 +1,4 @@
+.env
+vendor/
+storage/sync.lock
+storage/sync.log
