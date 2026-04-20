@@ -56,6 +56,7 @@ function logMessage(string $level, string $message, array $config): void
  *   http_code — código HTTP recibido (0 si hubo error de red)
  *   error     — descripción del fallo, vacía si todo fue bien
  *   response  — primeros 200 chars del cuerpo de respuesta
+ *   payload   — JSON enviado (para debug en el log)
  */
 function postMeasurement(array $record, array $config): array
 {
@@ -102,6 +103,7 @@ function postMeasurement(array $record, array $config): array
             'http_code' => 0,
             'error'     => "cURL #$curlErrno: $curlError",
             'response'  => '',
+            'payload'   => (string) $payload,
         ];
     }
 
@@ -112,6 +114,7 @@ function postMeasurement(array $record, array $config): array
         'http_code' => $httpCode,
         'error'     => $ok ? '' : "HTTP $httpCode",
         'response'  => mb_substr(trim($body), 0, 200),
+        'payload'   => (string) $payload,
     ];
 }
 
@@ -215,6 +218,7 @@ foreach ($records as $record) {
         if ($result['response'] !== '') {
             $logMsg .= " | respuesta: {$result['response']}";
         }
+        $logMsg .= " | payload: {$result['payload']}";
 
         logMessage('ERROR', $logMsg, $config);
     }
