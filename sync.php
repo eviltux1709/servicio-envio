@@ -46,7 +46,14 @@ function logMessage(string $level, string $message, array $config): void
     file_put_contents($config['log_file'], $line, FILE_APPEND | LOCK_EX);
 }
 
-function postMeasurement(array $record, array $config): bool
+/**
+ * Retorna un array con el resultado del intento:
+ *   ok        — true si el servidor respondió HTTP 2xx
+ *   http_code — código HTTP recibido (0 si hubo error de red)
+ *   error     — descripción del fallo, vacía si todo fue bien
+ *   response  — primeros 200 chars del cuerpo de respuesta
+ */
+function postMeasurement(array $record, array $config): array
 {
     $payload = json_encode([
         'id'             => $record['id'],
@@ -73,16 +80,30 @@ function postMeasurement(array $record, array $config): bool
         ],
     ]);
 
-    curl_exec($ch);
+    $body      = (string) curl_exec($ch);
     $httpCode  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $curlErrno = curl_errno($ch);
+    $curlError = curl_error($ch);
     curl_close($ch);
 
+    // Error de red / transporte (timeout, DNS, TLS, etc.)
     if ($curlErrno !== 0) {
-        return false;
+        return [
+            'ok'        => false,
+            'http_code' => 0,
+            'error'     => "cURL #$curlErrno: $curlError",
+            'response'  => '',
+        ];
     }
 
-    return $httpCode >= 200 && $httpCode < 300;
+    $ok = $httpCode >= 200 && $httpCode < 300;
+
+    return [
+        'ok'        => $ok,
+        'http_code' => $httpCode,
+        'error'     => $ok ? '' : "HTTP $httpCode",
+        'response'  => mb_substr(trim($body), 0, 200),
+    ];
 }
 
 // ============================================================
@@ -171,14 +192,22 @@ $successCount = 0;
 $failCount    = 0;
 
 foreach ($records as $record) {
-    if (postMeasurement($record, $config)) {
+    $result = postMeasurement($record, $config);
+
+    if ($result['ok']) {
         $updateStmt->bindValue(':id', $record['id'], SQLITE3_INTEGER);
         $updateStmt->execute();
         $updateStmt->reset();
         $successCount++;
     } else {
         $failCount++;
-        logMessage('WARN', "Fallo al enviar ID={$record['id']}", $config);
+
+        $logMsg = "Fallo ID={$record['id']} | {$result['error']}";
+        if ($result['response'] !== '') {
+            $logMsg .= " | respuesta: {$result['response']}";
+        }
+
+        logMessage('ERROR', $logMsg, $config);
     }
 }
 
