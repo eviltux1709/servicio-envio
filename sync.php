@@ -73,6 +73,7 @@ function postMeasurement(array $record, array $config): array
         'temperature'    => round($record['temperature_x10'] / 10, 1),
         'signal_quality' => (int) $record['signal_quality'],
         'timestamp'      => $timestamp,
+        'read_status'   => (int) $record['read_status'],
     ], JSON_UNESCAPED_UNICODE);
 
     $ch = curl_init();
