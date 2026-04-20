@@ -26,6 +26,10 @@ $config = [
     'lock_file'      => $_ENV['LOCK_FILE'],
     'log_file'       => $_ENV['LOG_FILE'],
     'log_max_bytes'  => (int) ($_ENV['LOG_MAX_BYTES']  ?? 1048576),
+    // Si se define DEVICE_ID en .env, sobreescribe el device_id de la BD.
+    // Útil cuando todos los registros pertenecen al mismo dispositivo
+    // o al deployar en un servidor diferente.
+    'device_id'      => $_ENV['DEVICE_ID'] ?? null,
 ];
 
 // ============================================================
@@ -55,14 +59,19 @@ function logMessage(string $level, string $message, array $config): void
  */
 function postMeasurement(array $record, array $config): array
 {
+    // device_id: usa el override del .env si está definido, si no el de la BD
+    $deviceId = $config['device_id'] ?? $record['device_id'];
+
+    // Normalizar timestamp al formato que espera el servidor: "YYYY-MM-DD HH:MM:SS"
+    // La BD guarda ISO 8601 con microsegundos: "2026-04-05T18:50:35.473464"
+    $timestamp = str_replace('T', ' ', substr($record['timestamp'], 0, 19));
+
     $payload = json_encode([
-        'id'             => $record['id'],
-        'timestamp'      => $record['timestamp'],
-        'device_id'      => $record['device_id'],
-        'distance_cm'    => $record['distance_cm'],
+        'device_id'      => $deviceId,
+        'distance_cm'    => (float) $record['distance_cm'],
         'temperature'    => round($record['temperature_x10'] / 10, 1),
-        'signal_quality' => $record['signal_quality'],
-        'read_status'    => $record['read_status'],
+        'signal_quality' => (int) $record['signal_quality'],
+        'timestamp'      => $timestamp,
     ], JSON_UNESCAPED_UNICODE);
 
     $ch = curl_init();
